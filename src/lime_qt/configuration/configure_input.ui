@@ -848,6 +848,60 @@
          </property>
        </widget>
      </item>
+     <item>
+      <widget class="QGroupBox" name="groupBoxWebController">
+       <property name="title">
+        <string>Web Controller (iPhone / Phone / Tablet)</string>
+       </property>
+       <layout class="QVBoxLayout">
+        <item>
+         <widget class="QCheckBox" name="web_controller_enabled">
+          <property name="text">
+           <string>Enable web-based virtual controller (starts HTTP server when game launches)</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <layout class="QHBoxLayout">
+          <item>
+           <widget class="QLabel" name="labelWebPort">
+            <property name="text">
+             <string>Port:</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QSpinBox" name="web_controller_port">
+            <property name="minimum">
+             <number>1024</number>
+            </property>
+            <property name="maximum">
+             <number>65535</number>
+            </property>
+            <property name="value">
+             <number>8080</number>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="labelWebPortInfo">
+            <property name="text">
+             <string>Open http://&lt;your-local-ip&gt;:&lt;port&gt; on your phone when a game is running</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <spacer>
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+           </spacer>
+          </item>
+         </layout>
+        </item>
+       </layout>
+      </widget>
+     </item>
     </layout>
    </item>
   </layout>

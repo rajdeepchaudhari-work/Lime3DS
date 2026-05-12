@@ -432,6 +432,8 @@ struct Values {
     std::vector<InputProfile> input_profiles; ///< The list of input profiles
     std::vector<TouchFromButtonMap> touch_from_button_maps;
     Setting<bool> use_artic_base_controller{false, "use_artic_base_controller"};
+    Setting<bool> web_controller_enabled{false, "web_controller_enabled"};
+    Setting<u16> web_controller_port{8080, "web_controller_port"};
 
     SwitchableSetting<bool> enable_gamemode{true, "enable_gamemode"};
 

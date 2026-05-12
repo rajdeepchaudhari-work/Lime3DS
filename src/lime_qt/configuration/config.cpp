@@ -329,6 +329,8 @@ void Config::ReadControlValues() {
     qt_config->beginGroup(QStringLiteral("Controls"));
 
     ReadBasicSetting(Settings::values.use_artic_base_controller);
+    ReadBasicSetting(Settings::values.web_controller_enabled);
+    ReadBasicSetting(Settings::values.web_controller_port);
 
     int num_touch_from_button_maps =
         qt_config->beginReadArray(QStringLiteral("touch_from_button_maps"));
@@ -950,6 +952,8 @@ void Config::SaveControlValues() {
     qt_config->beginGroup(QStringLiteral("Controls"));
 
     WriteBasicSetting(Settings::values.use_artic_base_controller);
+    WriteBasicSetting(Settings::values.web_controller_enabled);
+    WriteBasicSetting(Settings::values.web_controller_port);
 
     WriteSetting(QStringLiteral("profile"), Settings::values.current_input_profile_index, 0);
     qt_config->beginWriteArray(QStringLiteral("profiles"));

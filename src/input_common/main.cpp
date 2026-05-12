@@ -17,6 +17,7 @@
 #include "input_common/sdl/sdl_impl.h"
 #include "input_common/touch_from_button.h"
 #include "input_common/udp/udp.h"
+#include "input_common/web_controller/web_controller.h"
 
 namespace InputCommon {
 
@@ -29,6 +30,7 @@ static std::shared_ptr<Keyboard> keyboard;
 static std::shared_ptr<MotionEmu> motion_emu;
 static std::unique_ptr<CemuhookUDP::State> udp;
 static std::unique_ptr<SDL::State> sdl;
+static std::unique_ptr<WebController::WebControllerState> web_controller;
 
 void Init() {
 #ifdef ENABLE_GCADAPTER
@@ -135,6 +137,26 @@ void ReloadInputDevices() {
         return;
     }
     udp->ReloadUDPClient();
+}
+
+void StartWebController(u16 port) {
+    if (web_controller) {
+        return;
+    }
+    web_controller = WebController::Init(port);
+}
+
+void StopWebController() {
+    if (!web_controller) {
+        return;
+    }
+    Input::UnregisterFactory<Input::ButtonDevice>("web_controller");
+    Input::UnregisterFactory<Input::AnalogDevice>("web_controller");
+    web_controller.reset();
+}
+
+WebController::WebControllerState* GetWebController() {
+    return web_controller.get();
 }
 
 namespace Polling {

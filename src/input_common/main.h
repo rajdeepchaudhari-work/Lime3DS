@@ -8,6 +8,8 @@
 #include <string>
 #include <vector>
 
+#include "common/common_types.h"
+
 namespace Common {
 class ParamPackage;
 }
@@ -42,6 +44,18 @@ Common::ParamPackage GetControllerAnalogBinds(const Common::ParamPackage& params
 
 /// Reloads the input devices
 void ReloadInputDevices();
+
+/// Starts the web controller HTTP server on the given port and registers input factories.
+void StartWebController(u16 port);
+
+/// Stops the web controller HTTP server and unregisters its input factories.
+void StopWebController();
+
+namespace WebController {
+class WebControllerState;
+}
+/// Returns the active WebControllerState, or nullptr if not running.
+WebController::WebControllerState* GetWebController();
 
 namespace Polling {
 

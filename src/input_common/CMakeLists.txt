@@ -18,6 +18,12 @@ add_library(input_common STATIC
     udp/protocol.h
     udp/udp.cpp
     udp/udp.h
+    web_controller/controller_html.cpp
+    web_controller/controller_html.h
+    web_controller/web_controller.cpp
+    web_controller/web_controller.h
+    web_controller/web_controller_state.cpp
+    web_controller/web_controller_state.h
 )
 
 if(ENABLE_SDL2)
@@ -42,7 +48,7 @@ if(ENABLE_LIBUSB)
 endif()
 
 create_target_directory_groups(input_common)
-target_link_libraries(input_common PUBLIC lime_core PRIVATE lime_common ${Boost_LIBRARIES})
+target_link_libraries(input_common PUBLIC lime_core PRIVATE lime_common ${Boost_LIBRARIES} httplib json-headers)
 
 if (CITRA_USE_PRECOMPILED_HEADERS)
     target_precompile_headers(input_common PRIVATE precompiled_headers.h)

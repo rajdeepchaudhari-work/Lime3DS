@@ -403,6 +403,9 @@ ConfigureInput::~ConfigureInput() = default;
 void ConfigureInput::ApplyConfiguration() {
 
     Settings::values.use_artic_base_controller = ui->use_artic_controller->isChecked();
+    Settings::values.web_controller_enabled = ui->web_controller_enabled->isChecked();
+    Settings::values.web_controller_port =
+        static_cast<u16>(ui->web_controller_port->value());
 
     std::transform(buttons_param.begin(), buttons_param.end(),
                    Settings::values.current_input_profile.buttons.begin(),
@@ -451,6 +454,10 @@ void ConfigureInput::LoadConfiguration() {
 
     ui->use_artic_controller->setChecked(Settings::values.use_artic_base_controller.GetValue());
     ui->use_artic_controller->setEnabled(!system.IsPoweredOn());
+    ui->web_controller_enabled->setChecked(Settings::values.web_controller_enabled.GetValue());
+    ui->web_controller_enabled->setEnabled(!system.IsPoweredOn());
+    ui->web_controller_port->setValue(Settings::values.web_controller_port.GetValue());
+    ui->web_controller_port->setEnabled(!system.IsPoweredOn());
 
     std::transform(Settings::values.current_input_profile.buttons.begin(),
                    Settings::values.current_input_profile.buttons.end(), buttons_param.begin(),

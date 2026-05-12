@@ -81,6 +81,7 @@
 #if CITRA_ARCH(x86_64)
 #include "common/x64/cpu_detect.h"
 #endif
+#include "common/param_package.h"
 #include "common/settings.h"
 #include "common/string_util.h"
 #include "core/core.h"
@@ -96,6 +97,7 @@
 #include "core/savestate.h"
 #include "core/system_titles.h"
 #include "input_common/main.h"
+#include "input_common/web_controller/web_controller_state.h"
 #include "ui_main.h"
 #include "video_core/gpu.h"
 #include "video_core/renderer_base.h"
@@ -459,6 +461,14 @@ void GMainWindow::InitializeWidgets() {
 
     statusBar()->addPermanentWidget(multiplayer_state->GetStatusText());
     statusBar()->addPermanentWidget(multiplayer_state->GetStatusIcon());
+
+    web_controller_url_label_ = new QLabel();
+    web_controller_url_label_->setOpenExternalLinks(false);
+    web_controller_url_label_->setFrameStyle(QFrame::NoFrame);
+    web_controller_url_label_->setContentsMargins(4, 0, 4, 0);
+    web_controller_url_label_->setToolTip(tr("Web Controller — open this URL on your phone"));
+    web_controller_url_label_->setVisible(false);
+    statusBar()->addPermanentWidget(web_controller_url_label_);
 
     statusBar()->setVisible(true);
 
@@ -1316,6 +1326,53 @@ bool GMainWindow::LoadROM(const QString& filename) {
     return true;
 }
 
+void GMainWindow::StartWebControllerIfEnabled() {
+    if (!Settings::values.web_controller_enabled.GetValue()) {
+        return;
+    }
+    const u16 port = Settings::values.web_controller_port.GetValue();
+    InputCommon::StartWebController(port);
+
+    // Override all HID button slots to use the web controller engine
+    web_controller_saved_profile_ = Settings::values.current_input_profile;
+    web_controller_profile_overridden_ = true;
+
+    namespace B = Settings::NativeButton;
+    for (int i = B::BUTTON_HID_BEGIN; i < B::BUTTON_HID_END; ++i) {
+        Common::ParamPackage pkg{{"engine", "web_controller"},
+                                 {"button_index", std::to_string(i)}};
+        Settings::values.current_input_profile.buttons[i] = pkg.Serialize();
+    }
+    // Override circle pad analog
+    Common::ParamPackage analog_pkg{{"engine", "web_controller"}};
+    Settings::values.current_input_profile.analogs[Settings::NativeAnalog::CirclePad] =
+        analog_pkg.Serialize();
+
+    system.ApplySettings();
+
+    // Show URL in status bar
+    if (auto* wc = InputCommon::GetWebController()) {
+        const std::string url =
+            "http://" + wc->GetLocalIPAddress() + ":" + std::to_string(wc->GetPort());
+        web_controller_url_label_->setText(
+            tr("🎮 %1").arg(QString::fromStdString(url)));
+        web_controller_url_label_->setVisible(true);
+    }
+}
+
+void GMainWindow::StopWebControllerIfRunning() {
+    if (!web_controller_profile_overridden_) {
+        return;
+    }
+    Settings::values.current_input_profile = web_controller_saved_profile_;
+    web_controller_profile_overridden_ = false;
+
+    InputCommon::StopWebController();
+
+    web_controller_url_label_->setVisible(false);
+    web_controller_url_label_->clear();
+}
+
 void GMainWindow::BootGame(const QString& filename) {
     if (emu_thread) {
         ShutdownGame();
@@ -1414,6 +1471,7 @@ void GMainWindow::BootGame(const QString& filename) {
     // Create and start the emulation thread
     emu_thread = std::make_unique<EmuThread>(system, *render_window);
     emit EmulationStarting(emu_thread.get());
+    StartWebControllerIfEnabled();
     emu_thread->start();
 
     connect(render_window, &GRenderWindow::Closed, this, &GMainWindow::OnStopGame);
@@ -1498,6 +1556,7 @@ void GMainWindow::ShutdownGame() {
     system.frame_limiter.SetFrameAdvancing(false);
 
     emit EmulationStopping();
+    StopWebControllerIfRunning();
 
     // Wait for emulation thread to complete and delete it
     emu_thread->wait();

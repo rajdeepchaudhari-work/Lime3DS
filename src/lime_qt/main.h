@@ -12,6 +12,7 @@
 #include <QString>
 #include <QTimer>
 #include <QTranslator>
+#include "common/settings.h"
 #include "core/core.h"
 #include "core/savestate.h"
 #include "lime_qt/compatibility_list.h"
@@ -160,6 +161,9 @@ private:
     bool LoadROM(const QString& filename);
     void BootGame(const QString& filename);
     void ShutdownGame();
+
+    void StartWebControllerIfEnabled();
+    void StopWebControllerIfRunning();
 
     void SetDiscordEnabled(bool state);
     void LoadAmiibo(const QString& filename);
@@ -328,6 +332,11 @@ private:
 
     GameListPlaceholder* game_list_placeholder;
     LoadingScreen* loading_screen;
+
+    // Web controller
+    Settings::InputProfile web_controller_saved_profile_;
+    bool web_controller_profile_overridden_ = false;
+    QLabel* web_controller_url_label_ = nullptr;
 
     // Status bar elements
     QProgressBar* progress_bar = nullptr;
