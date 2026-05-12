@@ -150,8 +150,7 @@ void StopWebController() {
     if (!web_controller) {
         return;
     }
-    Input::UnregisterFactory<Input::ButtonDevice>("web_controller");
-    Input::UnregisterFactory<Input::AnalogDevice>("web_controller");
+    WebController::Shutdown();
     web_controller.reset();
 }
 

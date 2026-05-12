@@ -96,6 +96,8 @@
 #include "core/movie.h"
 #include "core/savestate.h"
 #include "core/system_titles.h"
+#include "core/3ds.h"
+#include "core/frontend/framebuffer_layout.h"
 #include "input_common/main.h"
 #include "input_common/web_controller/web_controller_state.h"
 #include "ui_main.h"
@@ -1348,15 +1350,24 @@ void GMainWindow::StartWebControllerIfEnabled() {
     Settings::values.current_input_profile.analogs[Settings::NativeAnalog::CirclePad] =
         analog_pkg.Serialize();
 
+    // Override touch device to route through the web controller
+    Settings::values.current_input_profile.touch_device = "engine:web_touch";
+
     system.ApplySettings();
 
-    // Show URL in status bar
+    // Show URL in status bar and start bottom-screen streaming
     if (auto* wc = InputCommon::GetWebController()) {
         const std::string url =
             "http://" + wc->GetLocalIPAddress() + ":" + std::to_string(wc->GetPort());
         web_controller_url_label_->setText(
             tr("🎮 %1").arg(QString::fromStdString(url)));
         web_controller_url_label_->setVisible(true);
+
+        // Begin MJPEG capture of the bottom (touch) screen
+        const auto layout = Layout::SeparateWindowsLayout(
+            Core::kScreenBottomWidth, Core::kScreenBottomHeight,
+            /*is_secondary=*/true, /*upright=*/false);
+        wc->SetRenderer(&system.GPU().Renderer(), layout);
     }
 }
 
@@ -1364,6 +1375,11 @@ void GMainWindow::StopWebControllerIfRunning() {
     if (!web_controller_profile_overridden_) {
         return;
     }
+    // Stop the screen capture chain before the renderer is torn down
+    if (auto* wc = InputCommon::GetWebController()) {
+        wc->StopStreaming();
+    }
+
     Settings::values.current_input_profile = web_controller_saved_profile_;
     web_controller_profile_overridden_ = false;
 
@@ -1556,11 +1572,20 @@ void GMainWindow::ShutdownGame() {
     system.frame_limiter.SetFrameAdvancing(false);
 
     emit EmulationStopping();
-    StopWebControllerIfRunning();
+
+    // Stop arming new screenshots before the emu thread exits — the callback lambda
+    // captures `this` (WebControllerState) and must not run after the object is destroyed.
+    if (auto* wc = InputCommon::GetWebController()) {
+        wc->StopStreaming();
+    }
 
     // Wait for emulation thread to complete and delete it
     emu_thread->wait();
     emu_thread = nullptr;
+
+    // Now that the emu thread is stopped (no more screenshot callbacks can fire),
+    // it is safe to destroy WebControllerState and restore settings.
+    StopWebControllerIfRunning();
 
     OnCloseMovie();
 
