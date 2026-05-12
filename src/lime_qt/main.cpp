@@ -708,6 +708,22 @@ void GMainWindow::InitializeHotkeys() {
         UpdateStatusBar();
     });
 
+    connect_shortcut(QStringLiteral("Toggle Fast Forward"), [this] {
+        if (!emulation_running) {
+            return;
+        }
+        if (!fast_forward_active_) {
+            fast_forward_saved_frame_limit_ = Settings::values.frame_limit.GetValue();
+            Settings::values.frame_limit.SetValue(
+                Settings::values.fast_forward_speed.GetValue());
+            fast_forward_active_ = true;
+        } else {
+            Settings::values.frame_limit.SetValue(fast_forward_saved_frame_limit_);
+            fast_forward_active_ = false;
+        }
+        UpdateStatusBar();
+    });
+
     connect_shortcut(QStringLiteral("Audio Mute/Unmute"), &GMainWindow::OnMute);
     connect_shortcut(QStringLiteral("Audio Volume Down"), &GMainWindow::OnDecreaseVolume);
     connect_shortcut(QStringLiteral("Audio Volume Up"), &GMainWindow::OnIncreaseVolume);
@@ -1586,6 +1602,12 @@ void GMainWindow::ShutdownGame() {
     // Now that the emu thread is stopped (no more screenshot callbacks can fire),
     // it is safe to destroy WebControllerState and restore settings.
     StopWebControllerIfRunning();
+
+    // Restore frame limit if fast-forward was left on when the game ended.
+    if (fast_forward_active_) {
+        Settings::values.frame_limit.SetValue(fast_forward_saved_frame_limit_);
+        fast_forward_active_ = false;
+    }
 
     OnCloseMovie();
 

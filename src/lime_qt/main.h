@@ -338,6 +338,10 @@ private:
     bool web_controller_profile_overridden_ = false;
     QLabel* web_controller_url_label_ = nullptr;
 
+    // Fast-forward toggle
+    bool fast_forward_active_ = false;
+    u16 fast_forward_saved_frame_limit_ = 100;
+
     // Status bar elements
     QProgressBar* progress_bar = nullptr;
     QLabel* message_label = nullptr;

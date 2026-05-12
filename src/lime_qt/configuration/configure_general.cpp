@@ -91,6 +91,7 @@ void ConfigureGeneral::SetConfiguration() {
     } else {
         ui->frame_limit->setValue(SettingsToSlider(Settings::values.frame_limit.GetValue()));
     }
+    ui->fast_forward_speed->setValue(Settings::values.fast_forward_speed.GetValue());
     if (ui->frame_limit->value() == ui->frame_limit->maximum()) {
         ui->emulation_speed_display_label->setText(tr("unthrottled"));
     } else {
@@ -172,6 +173,9 @@ void ConfigureGeneral::ApplyConfiguration() {
     ConfigurationShared::ApplyPerGameSetting(
         &UISettings::values.screenshot_path, ui->screenshot_combo,
         [this](s32) { return ui->screenshot_dir_path->text().toStdString(); });
+
+    Settings::values.fast_forward_speed.SetValue(
+        static_cast<u16>(ui->fast_forward_speed->value()));
 
     if (Settings::IsConfiguringGlobal()) {
         UISettings::values.confirm_before_closing = ui->toggle_check_exit->isChecked();
