@@ -55,8 +55,7 @@ public:
     bool IsRunning() const;
 
     // Screen streaming — call after the renderer is ready (BootGame).
-    void SetRenderer(VideoCore::RendererBase* renderer,
-                     const Layout::FramebufferLayout& layout);
+    void SetRenderer(VideoCore::RendererBase* renderer, const Layout::FramebufferLayout& layout);
 
     // Stop the capture chain before ShutdownGame destroys the renderer.
     void StopStreaming();

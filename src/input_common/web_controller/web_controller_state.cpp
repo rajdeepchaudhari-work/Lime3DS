@@ -1,12 +1,12 @@
-#include "input_common/web_controller/web_controller_state.h"
 #include "input_common/web_controller/controller_html.h"
+#include "input_common/web_controller/web_controller_state.h"
 #include "video_core/renderer_base.h"
 
+#include <chrono>
 #include <QBuffer>
 #include <QImage>
-#include <chrono>
-#include <json.hpp>
 #include <httplib.h>
+#include <json.hpp>
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -25,11 +25,10 @@ namespace InputCommon::WebController {
 static const std::unordered_map<std::string, int>& ButtonNameMap() {
     namespace B = Settings::NativeButton;
     static const std::unordered_map<std::string, int> map{
-        {"a", B::A},           {"b", B::B},         {"x", B::X},
-        {"y", B::Y},           {"up", B::Up},        {"down", B::Down},
-        {"left", B::Left},     {"right", B::Right},  {"l", B::L},
-        {"r", B::R},           {"start", B::Start},  {"select", B::Select},
-        {"debug", B::Debug},   {"gpio14", B::Gpio14},
+        {"a", B::A},         {"b", B::B},           {"x", B::X},         {"y", B::Y},
+        {"up", B::Up},       {"down", B::Down},     {"left", B::Left},   {"right", B::Right},
+        {"l", B::L},         {"r", B::R},           {"start", B::Start}, {"select", B::Select},
+        {"debug", B::Debug}, {"gpio14", B::Gpio14},
     };
     return map;
 }
@@ -64,8 +63,7 @@ WebControllerState::WebControllerState(u16 port)
     // Recording the poll time tells FrameRequestLoop a client is active.
     server_->Get("/screen", [this](const httplib::Request&, httplib::Response& res) {
         // Signal FrameRequestLoop that a client is actively polling.
-        last_poll_ns_.store(
-            std::chrono::steady_clock::now().time_since_epoch().count());
+        last_poll_ns_.store(std::chrono::steady_clock::now().time_since_epoch().count());
 
         if (!streaming_active_.load()) {
             res.status = 503;
@@ -112,10 +110,8 @@ WebControllerState::WebControllerState(u16 port)
                     state->buttons[it->second] = pressed;
                 }
             } else if (j.contains("analog")) {
-                state->circle_pad_x =
-                    std::clamp(j["analog"]["x"].get<float>(), -1.0f, 1.0f);
-                state->circle_pad_y =
-                    std::clamp(j["analog"]["y"].get<float>(), -1.0f, 1.0f);
+                state->circle_pad_x = std::clamp(j["analog"]["x"].get<float>(), -1.0f, 1.0f);
+                state->circle_pad_y = std::clamp(j["analog"]["y"].get<float>(), -1.0f, 1.0f);
             } else if (j.contains("touch")) {
                 state->touch_x = std::clamp(j["touch"]["x"].get<float>(), 0.0f, 1.0f);
                 state->touch_y = std::clamp(j["touch"]["y"].get<float>(), 0.0f, 1.0f);
@@ -154,7 +150,7 @@ bool WebControllerState::IsRunning() const {
 // ── Screen streaming ───────────────────────────────────────────────────────────
 
 void WebControllerState::SetRenderer(VideoCore::RendererBase* renderer,
-                                      const Layout::FramebufferLayout& layout) {
+                                     const Layout::FramebufferLayout& layout) {
     StopStreaming();
     renderer_ = renderer;
     stream_layout_ = layout;
@@ -198,7 +194,8 @@ void WebControllerState::FrameRequestLoop() {
 
     while (streaming_active_.load()) {
         std::this_thread::sleep_for(kInterval);
-        if (!streaming_active_.load()) break;
+        if (!streaming_active_.load())
+            break;
 
         const auto now_ns = std::chrono::steady_clock::now().time_since_epoch().count();
         const auto last_poll = last_poll_ns_.load();
@@ -209,9 +206,12 @@ void WebControllerState::FrameRequestLoop() {
 }
 
 void WebControllerState::RequestNextFrame() {
-    if (!streaming_active_.load() || !renderer_) return;
-    if (capture_in_progress_.load()) return;
-    if (!latest_frame_) return;
+    if (!streaming_active_.load() || !renderer_)
+        return;
+    if (capture_in_progress_.load())
+        return;
+    if (!latest_frame_)
+        return;
 
     capture_in_progress_.store(true);
     renderer_->RequestScreenshot(
@@ -240,14 +240,16 @@ void WebControllerState::EncodeThread() {
         {
             std::unique_lock lock(encode_mutex_);
             encode_cv_.wait(lock, [this] { return encode_pending_ || encode_stop_; });
-            if (encode_stop_ && !encode_pending_) break;
+            if (encode_stop_ && !encode_pending_)
+                break;
             pixels = encode_buffer_;
             invert_y = encode_invert_y_;
             encode_pending_ = false;
         }
 
         auto frame = latest_frame_;
-        if (!frame || !streaming_active_.load()) continue;
+        if (!frame || !streaming_active_.load())
+            continue;
 
         QImage img(pixels.data(), static_cast<int>(stream_layout_.width),
                    static_cast<int>(stream_layout_.height), QImage::Format_RGB32);

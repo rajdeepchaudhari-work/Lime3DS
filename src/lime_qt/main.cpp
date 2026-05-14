@@ -84,11 +84,13 @@
 #include "common/param_package.h"
 #include "common/settings.h"
 #include "common/string_util.h"
+#include "core/3ds.h"
 #include "core/core.h"
 #include "core/dumping/backend.h"
 #include "core/file_sys/archive_extsavedata.h"
 #include "core/file_sys/archive_source_sd_savedata.h"
 #include "core/frontend/applets/default_applets.h"
+#include "core/frontend/framebuffer_layout.h"
 #include "core/hle/service/am/am.h"
 #include "core/hle/service/fs/archive.h"
 #include "core/hle/service/nfc/nfc.h"
@@ -96,8 +98,6 @@
 #include "core/movie.h"
 #include "core/savestate.h"
 #include "core/system_titles.h"
-#include "core/3ds.h"
-#include "core/frontend/framebuffer_layout.h"
 #include "input_common/main.h"
 #include "input_common/web_controller/web_controller_state.h"
 #include "ui_main.h"
@@ -1013,7 +1013,7 @@ void GMainWindow::UpdateMenuState() {
     ui->action_Capture_Screenshot->setEnabled(emulation_running && !is_paused);
     ui->action_Advance_Frame->setEnabled(emulation_running && is_paused);
     ui->action_Toggle_Web_Controller->setChecked(emulation_running &&
-                                                  web_controller_profile_overridden_);
+                                                 web_controller_profile_overridden_);
 
     if (emulation_running && is_paused) {
         ui->action_Pause->setText(tr("&Continue"));
@@ -1364,8 +1364,7 @@ void GMainWindow::StartWebControllerIfEnabled() {
 
     namespace B = Settings::NativeButton;
     for (int i = B::BUTTON_HID_BEGIN; i < B::BUTTON_HID_END; ++i) {
-        Common::ParamPackage pkg{{"engine", "web_controller"},
-                                 {"button_index", std::to_string(i)}};
+        Common::ParamPackage pkg{{"engine", "web_controller"}, {"button_index", std::to_string(i)}};
         Settings::values.current_input_profile.buttons[i] = pkg.Serialize();
     }
     // Override circle pad analog
@@ -1382,14 +1381,13 @@ void GMainWindow::StartWebControllerIfEnabled() {
     if (auto* wc = InputCommon::GetWebController()) {
         const std::string url =
             "http://" + wc->GetLocalIPAddress() + ":" + std::to_string(wc->GetPort());
-        web_controller_url_label_->setText(
-            tr("🎮 %1").arg(QString::fromStdString(url)));
+        web_controller_url_label_->setText(tr("🎮 %1").arg(QString::fromStdString(url)));
         web_controller_url_label_->setVisible(true);
 
         // Begin MJPEG capture of the bottom (touch) screen
-        const auto layout = Layout::SeparateWindowsLayout(
-            Core::kScreenBottomWidth, Core::kScreenBottomHeight,
-            /*is_secondary=*/true, /*upright=*/false);
+        const auto layout =
+            Layout::SeparateWindowsLayout(Core::kScreenBottomWidth, Core::kScreenBottomHeight,
+                                          /*is_secondary=*/true, /*upright=*/false);
         wc->SetRenderer(&system.GPU().Renderer(), layout);
     }
 }
@@ -1449,9 +1447,9 @@ void GMainWindow::OnToggleWebController() {
             web_controller_url_label_->setText(tr("🎮 %1").arg(QString::fromStdString(url)));
             web_controller_url_label_->setVisible(true);
 
-            const auto layout = Layout::SeparateWindowsLayout(
-                Core::kScreenBottomWidth, Core::kScreenBottomHeight,
-                /*is_secondary=*/true, /*upright=*/false);
+            const auto layout =
+                Layout::SeparateWindowsLayout(Core::kScreenBottomWidth, Core::kScreenBottomHeight,
+                                              /*is_secondary=*/true, /*upright=*/false);
             wc->SetRenderer(&system.GPU().Renderer(), layout);
         }
     }
