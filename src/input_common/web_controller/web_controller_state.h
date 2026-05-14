@@ -55,7 +55,6 @@ public:
     bool IsRunning() const;
 
     // Screen streaming — call after the renderer is ready (BootGame).
-    // Starts the self-sustaining capture chain and enables GET /screen.
     void SetRenderer(VideoCore::RendererBase* renderer,
                      const Layout::FramebufferLayout& layout);
 
@@ -65,6 +64,8 @@ public:
 private:
     void ServerThread(u16 port);
     void RequestNextFrame();
+    void EncodeThread();
+    void FrameRequestLoop();
 
     std::shared_ptr<WebControllerButtonState> state_;
     std::unique_ptr<httplib::Server> server_;
@@ -74,26 +75,34 @@ private:
     // Streaming state
     struct LatestFrame {
         std::mutex mutex;
-        std::condition_variable cv;
         std::vector<uint8_t> jpeg;
-        bool fresh{false};
     };
     std::shared_ptr<LatestFrame> latest_frame_;
     std::atomic<bool> streaming_active_{false};
     VideoCore::RendererBase* renderer_{nullptr};
     Layout::FramebufferLayout stream_layout_{};
+
+    // capture_buffer_: written by emu thread callback (raw BGRA pixels from GPU readback)
     std::vector<uint8_t> capture_buffer_;
 
-    // Frame request thread: fires RequestNextFrame at ~20fps only when a client is polling.
+    // encode_buffer_: copied from capture_buffer_ inside the callback (fast memcpy),
+    // then consumed by EncodeThread to produce JPEG — keeps JPEG work off the emu thread.
+    std::mutex encode_mutex_;
+    std::condition_variable encode_cv_;
+    std::vector<uint8_t> encode_buffer_;
+    bool encode_invert_y_{false};
+    bool encode_pending_{false};
+    bool encode_stop_{false};
+    std::thread encode_thread_;
+
+    // Frame request thread: fires RequestNextFrame at ~10fps only when a client is polling.
     // last_poll_ns_ is updated by the /screen handler; if it's stale (>3s), we stop arming.
     std::thread frame_request_thread_;
     std::atomic<long long> last_poll_ns_{0};
-    void FrameRequestLoop();
 
-    // Guards against the data race between FrameRequestLoop writing screenshot_complete_callback
-    // into RendererSettings and the emu thread reading+calling it in RenderScreenshot().
-    // Stays true from RequestScreenshot() until the callback body completes, so the loop
-    // never overwrites the callback while the emu thread is still using it.
+    // Guards against the data race between FrameRequestLoop arming a new screenshot and
+    // the emu thread still executing a previous callback. Stays true from RequestScreenshot()
+    // until the callback body finishes (after signalling the encode thread).
     std::atomic<bool> capture_in_progress_{false};
 };
 

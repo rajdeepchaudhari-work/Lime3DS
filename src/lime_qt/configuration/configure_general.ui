@@ -241,17 +241,17 @@
            <property name="bottomMargin"><number>0</number></property>
            <item>
             <widget class="QLabel" name="label_fast_forward_speed">
-             <property name="text"><string>Fast-Forward Speed:</string></property>
+             <property name="text"><string>Fast-Forward Multiplier:</string></property>
             </widget>
            </item>
            <item>
             <widget class="QSpinBox" name="fast_forward_speed">
-             <property name="toolTip"><string>Speed multiplier when fast-forward is active (% of base speed). 200 = 2× normal speed.</string></property>
-             <property name="suffix"><string>%</string></property>
-             <property name="minimum"><number>100</number></property>
-             <property name="maximum"><number>3000</number></property>
-             <property name="singleStep"><number>50</number></property>
-             <property name="value"><number>200</number></property>
+             <property name="toolTip"><string>Speed multiplier when fast-forward is active. 2 = 2× normal speed, 3 = 3× normal speed, etc.</string></property>
+             <property name="suffix"><string>×</string></property>
+             <property name="minimum"><number>2</number></property>
+             <property name="maximum"><number>10</number></property>
+             <property name="singleStep"><number>1</number></property>
+             <property name="value"><number>2</number></property>
             </widget>
            </item>
            <item>

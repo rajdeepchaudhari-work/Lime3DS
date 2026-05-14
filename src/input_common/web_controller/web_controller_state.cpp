@@ -87,7 +87,7 @@ WebControllerState::WebControllerState(u16 port)
             res.set_content("No frame yet", "text/plain");
             return;
         }
-        res.set_header("Cache-Control", "no-cache, no-store");
+        res.set_header("Cache-Control", "no-store");
         res.set_content(reinterpret_cast<const char*>(data.data()), data.size(), "image/jpeg");
     });
 
@@ -155,39 +155,46 @@ bool WebControllerState::IsRunning() const {
 
 void WebControllerState::SetRenderer(VideoCore::RendererBase* renderer,
                                       const Layout::FramebufferLayout& layout) {
-    StopStreaming(); // stop any existing stream/thread first
+    StopStreaming();
     renderer_ = renderer;
     stream_layout_ = layout;
-    capture_buffer_.resize(static_cast<size_t>(layout.width) * layout.height * 4);
+    const size_t pixel_bytes = static_cast<size_t>(layout.width) * layout.height * 4;
+    capture_buffer_.resize(pixel_bytes);
+    encode_buffer_.resize(pixel_bytes);
     latest_frame_ = std::make_shared<LatestFrame>();
     last_poll_ns_.store(0);
+    encode_pending_ = false;
+    encode_stop_ = false;
     streaming_active_.store(true);
+    encode_thread_ = std::thread([this] { EncodeThread(); });
     frame_request_thread_ = std::thread([this] { FrameRequestLoop(); });
 }
 
 void WebControllerState::StopStreaming() {
     streaming_active_.store(false);
-    // Join the frame thread before nulling renderer_ so the thread can't race
-    // a RequestNextFrame call against a dangling renderer pointer.
     if (frame_request_thread_.joinable()) {
         frame_request_thread_.join();
     }
-    // Any in-flight callback will see streaming_active_=false and skip the JPEG encode,
-    // then clear capture_in_progress_. Reset it here so the next SetRenderer() starts clean.
+    {
+        std::lock_guard lock(encode_mutex_);
+        encode_stop_ = true;
+        encode_pending_ = false;
+    }
+    encode_cv_.notify_all();
+    if (encode_thread_.joinable()) {
+        encode_thread_.join();
+    }
     capture_in_progress_.store(false);
     renderer_ = nullptr;
-    if (latest_frame_) {
-        latest_frame_->cv.notify_all();
-        latest_frame_.reset();
-    }
+    latest_frame_.reset();
 }
 
 void WebControllerState::FrameRequestLoop() {
-    // Fires RequestNextFrame at ~20fps, but only while a client is actively polling.
-    // If no /screen request has arrived in the last 3 seconds, we stop arming
-    // screenshots so the emu thread has zero capture overhead during idle periods.
+    // Fires RequestNextFrame at ~10fps only while a client is actively polling.
+    // If no /screen request has arrived in the last 3 seconds, stop arming screenshots
+    // so the emu thread has zero capture overhead during idle periods.
     static constexpr long long kThreeSecNs = 3'000'000'000LL;
-    static constexpr auto kInterval = std::chrono::milliseconds(50);
+    static constexpr auto kInterval = std::chrono::milliseconds(100);
 
     while (streaming_active_.load()) {
         std::this_thread::sleep_for(kInterval);
@@ -203,44 +210,59 @@ void WebControllerState::FrameRequestLoop() {
 
 void WebControllerState::RequestNextFrame() {
     if (!streaming_active_.load() || !renderer_) return;
-    // Use capture_in_progress_ instead of IsScreenshotPending().
-    // IsScreenshotPending() returns false as soon as the emu thread's RenderScreenshot()
-    // exchanges the flag to false — but the callback hasn't been called yet at that point.
-    // Arming a new screenshot there overwrites screenshot_complete_callback while the emu
-    // thread is still about to read+call it → data race → SIGSEGV.
-    // capture_in_progress_ stays true until the callback body finishes, closing the window.
     if (capture_in_progress_.load()) return;
-    auto frame = latest_frame_;
-    if (!frame) return;
+    if (!latest_frame_) return;
 
     capture_in_progress_.store(true);
     renderer_->RequestScreenshot(
         capture_buffer_.data(),
-        [this, frame](bool invert_y) {
-            // The bool is invert_y (OpenGL=true, Vulkan=false), NOT a success flag.
-            if (frame && streaming_active_.load()) {
-                QImage img(capture_buffer_.data(), static_cast<int>(stream_layout_.width),
-                           static_cast<int>(stream_layout_.height), QImage::Format_RGB32);
-                if (invert_y) {
-                    img = img.mirrored(false, true);
+        [this](bool invert_y) {
+            // Emu thread: only memcpy pixels to encode_buffer_, then signal encode thread.
+            // JPEG encoding stays entirely off the emu thread.
+            {
+                std::lock_guard lock(encode_mutex_);
+                if (!encode_stop_) {
+                    encode_buffer_ = capture_buffer_;
+                    encode_invert_y_ = invert_y;
+                    encode_pending_ = true;
                 }
-                QByteArray arr;
-                QBuffer buf(&arr);
-                buf.open(QIODevice::WriteOnly);
-                img.save(&buf, "JPEG", 65);
-                buf.close();
-
-                {
-                    std::lock_guard lock(frame->mutex);
-                    frame->jpeg.assign(arr.begin(), arr.end());
-                    frame->fresh = true;
-                }
-                frame->cv.notify_all();
             }
-            // Release the guard — FrameRequestLoop may now arm the next screenshot.
+            encode_cv_.notify_one();
             capture_in_progress_.store(false);
         },
         stream_layout_);
+}
+
+void WebControllerState::EncodeThread() {
+    while (true) {
+        std::vector<uint8_t> pixels;
+        bool invert_y = false;
+        {
+            std::unique_lock lock(encode_mutex_);
+            encode_cv_.wait(lock, [this] { return encode_pending_ || encode_stop_; });
+            if (encode_stop_ && !encode_pending_) break;
+            pixels = encode_buffer_;
+            invert_y = encode_invert_y_;
+            encode_pending_ = false;
+        }
+
+        auto frame = latest_frame_;
+        if (!frame || !streaming_active_.load()) continue;
+
+        QImage img(pixels.data(), static_cast<int>(stream_layout_.width),
+                   static_cast<int>(stream_layout_.height), QImage::Format_RGB32);
+        if (invert_y) {
+            img = img.mirrored(false, true);
+        }
+        QByteArray arr;
+        QBuffer buf(&arr);
+        buf.open(QIODevice::WriteOnly);
+        img.save(&buf, "JPEG", 90);
+        buf.close();
+
+        std::lock_guard lock(frame->mutex);
+        frame->jpeg.assign(arr.begin(), arr.end());
+    }
 }
 
 // ── Network helpers ────────────────────────────────────────────────────────────

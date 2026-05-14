@@ -164,6 +164,7 @@ private:
 
     void StartWebControllerIfEnabled();
     void StopWebControllerIfRunning();
+    void OnToggleWebController();
 
     void SetDiscordEnabled(bool state);
     void LoadAmiibo(const QString& filename);

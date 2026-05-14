@@ -714,8 +714,11 @@ void GMainWindow::InitializeHotkeys() {
         }
         if (!fast_forward_active_) {
             fast_forward_saved_frame_limit_ = Settings::values.frame_limit.GetValue();
-            Settings::values.frame_limit.SetValue(
-                Settings::values.fast_forward_speed.GetValue());
+            const u16 base = fast_forward_saved_frame_limit_;
+            const u32 mult = Settings::values.fast_forward_speed.GetValue();
+            // 0 means unthrottled; multiplying unthrottled stays unthrottled
+            const u16 ff_limit = (base == 0) ? 0 : static_cast<u16>(std::min(995u, base * mult));
+            Settings::values.frame_limit.SetValue(ff_limit);
             fast_forward_active_ = true;
         } else {
             Settings::values.frame_limit.SetValue(fast_forward_saved_frame_limit_);
@@ -924,6 +927,7 @@ void GMainWindow::ConnectMenuEvents() {
     });
     connect_menu(ui->action_Configure, &GMainWindow::OnConfigure);
     connect_menu(ui->action_Configure_Current_Game, &GMainWindow::OnConfigurePerGame);
+    connect_menu(ui->action_Toggle_Web_Controller, &GMainWindow::OnToggleWebController);
 
     // View
     connect_menu(ui->action_Single_Window_Mode, &GMainWindow::ToggleWindowMode);
@@ -999,6 +1003,7 @@ void GMainWindow::UpdateMenuState() {
         ui->action_Remove_Amiibo,
         ui->action_Pause,
         ui->action_Advance_Frame,
+        ui->action_Toggle_Web_Controller,
     };
 
     for (QAction* action : running_actions) {
@@ -1007,6 +1012,8 @@ void GMainWindow::UpdateMenuState() {
 
     ui->action_Capture_Screenshot->setEnabled(emulation_running && !is_paused);
     ui->action_Advance_Frame->setEnabled(emulation_running && is_paused);
+    ui->action_Toggle_Web_Controller->setChecked(emulation_running &&
+                                                  web_controller_profile_overridden_);
 
     if (emulation_running && is_paused) {
         ui->action_Pause->setText(tr("&Continue"));
@@ -1403,6 +1410,52 @@ void GMainWindow::StopWebControllerIfRunning() {
 
     web_controller_url_label_->setVisible(false);
     web_controller_url_label_->clear();
+}
+
+void GMainWindow::OnToggleWebController() {
+    if (!emulation_running) {
+        return;
+    }
+    if (web_controller_profile_overridden_) {
+        if (auto* wc = InputCommon::GetWebController()) {
+            wc->StopStreaming();
+        }
+        StopWebControllerIfRunning();
+        system.ApplySettings();
+    } else {
+        // Start directly, bypassing the web_controller_enabled setting check,
+        // since the user explicitly requested it via the menu.
+        const u16 port = Settings::values.web_controller_port.GetValue();
+        InputCommon::StartWebController(port);
+
+        web_controller_saved_profile_ = Settings::values.current_input_profile;
+        web_controller_profile_overridden_ = true;
+
+        namespace B = Settings::NativeButton;
+        for (int i = B::BUTTON_HID_BEGIN; i < B::BUTTON_HID_END; ++i) {
+            Common::ParamPackage pkg{{"engine", "web_controller"},
+                                     {"button_index", std::to_string(i)}};
+            Settings::values.current_input_profile.buttons[i] = pkg.Serialize();
+        }
+        Common::ParamPackage analog_pkg{{"engine", "web_controller"}};
+        Settings::values.current_input_profile.analogs[Settings::NativeAnalog::CirclePad] =
+            analog_pkg.Serialize();
+        Settings::values.current_input_profile.touch_device = "engine:web_touch";
+        system.ApplySettings();
+
+        if (auto* wc = InputCommon::GetWebController()) {
+            const std::string url =
+                "http://" + wc->GetLocalIPAddress() + ":" + std::to_string(wc->GetPort());
+            web_controller_url_label_->setText(tr("🎮 %1").arg(QString::fromStdString(url)));
+            web_controller_url_label_->setVisible(true);
+
+            const auto layout = Layout::SeparateWindowsLayout(
+                Core::kScreenBottomWidth, Core::kScreenBottomHeight,
+                /*is_secondary=*/true, /*upright=*/false);
+            wc->SetRenderer(&system.GPU().Renderer(), layout);
+        }
+    }
+    UpdateMenuState();
 }
 
 void GMainWindow::BootGame(const QString& filename) {

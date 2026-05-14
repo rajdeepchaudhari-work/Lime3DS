@@ -111,6 +111,8 @@
     <addaction name="action_Stop"/>
     <addaction name="action_Restart"/>
     <addaction name="separator"/>
+    <addaction name="action_Toggle_Web_Controller"/>
+    <addaction name="separator"/>
     <addaction name="menu_Load_State"/>
     <addaction name="menu_Save_State"/>
     <addaction name="separator"/>
@@ -570,6 +572,20 @@
    </property>
    <property name="text">
     <string>Restart</string>
+   </property>
+  </action>
+  <action name="action_Toggle_Web_Controller">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Web Controller</string>
+   </property>
+   <property name="toolTip">
+    <string>Enable or disable the web controller while the game is running</string>
    </property>
   </action>
   <action name="action_Load_Amiibo">

@@ -92,6 +92,7 @@ private:
     std::mutex free_mutex;
     std::jthread present_thread;
     bool vsync_enabled{};
+    bool ff_mode_enabled{}; // tracks whether frame_limit was >100 last frame
     bool blit_supported;
     bool use_present_thread{true};
     void* last_render_surface{};

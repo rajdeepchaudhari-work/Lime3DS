@@ -363,8 +363,13 @@ void PresentWindow::CopyToSwapchain(Frame* frame) {
     const bool size_changed =
         swapchain.GetWidth() != frame->width || swapchain.GetHeight() != frame->height;
     const bool vsync_changed = vsync_enabled != use_vsync;
-    if (vsync_changed || size_changed) [[unlikely]] {
+    // When vsync is on, frame_limit>100 switches to mailbox present mode — so crossing
+    // that boundary also requires a swapchain recreate to pick up the new present mode.
+    const bool is_ff = Settings::values.frame_limit.GetValue() > 100;
+    const bool ff_changed = use_vsync && (ff_mode_enabled != is_ff);
+    if (vsync_changed || size_changed || ff_changed) [[unlikely]] {
         vsync_enabled = use_vsync;
+        ff_mode_enabled = is_ff;
         recreate_swapchain();
     }
 #endif

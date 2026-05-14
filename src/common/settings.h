@@ -484,9 +484,9 @@ struct Values {
     Setting<bool> use_shader_jit{true, "use_shader_jit"};
     SwitchableSetting<u32, true> resolution_factor{1, 0, 10, "resolution_factor"};
     SwitchableSetting<u16, true> frame_limit{100, 0, 1000, "frame_limit"};
-    // Speed multiplier applied while fast-forward is active, as a percentage of base speed.
-    // 200 = 2× normal speed, 400 = 4×, etc. Stored independently so it survives frame_limit edits.
-    Setting<u16, true> fast_forward_speed{200, 100, 3000, "fast_forward_speed"};
+    // Multiplier applied to the current frame_limit when fast-forward is active.
+    // 2 = 2× current speed, 3 = 3×, etc. Always relative to whatever speed is set.
+    Setting<u16, true> fast_forward_speed{2, 2, 10, "fast_forward_speed"};
     SwitchableSetting<TextureFilter> texture_filter{TextureFilter::None, "texture_filter"};
     SwitchableSetting<TextureSampling> texture_sampling{TextureSampling::GameControlled,
                                                         "texture_sampling"};

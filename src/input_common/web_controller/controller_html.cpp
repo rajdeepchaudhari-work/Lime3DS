@@ -390,7 +390,7 @@ outer.addEventListener('pointercancel',releaseCircle);
     img.onload=()=>{
       ctx.drawImage(img,0,0,canvas.width,canvas.height);
       pending=false;
-      setTimeout(next,50);
+      setTimeout(next,100);
     };
     img.onerror=()=>{ pending=false; setTimeout(next,500); };
     img.src='/screen?t='+Date.now();
@@ -400,20 +400,26 @@ outer.addEventListener('pointercancel',releaseCircle);
 
 // ── Screen touch forwarding ────────────────────────────────────
 const screenTouch=document.getElementById('screen-touch');
+let lastTouchMs=0;
+function screenTouchCoords(e){
+  const rect=screenTouch.getBoundingClientRect();
+  return[Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width)),
+         Math.max(0,Math.min(1,(e.clientY-rect.top)/rect.height))];
+}
 screenTouch.addEventListener('pointerdown',e=>{
   if(editMode)return;
   screenTouch.setPointerCapture(e.pointerId);
-  const rect=screenTouch.getBoundingClientRect();
-  const x=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));
-  const y=Math.max(0,Math.min(1,(e.clientY-rect.top)/rect.height));
+  const[x,y]=screenTouchCoords(e);
   haptic(12);
+  lastTouchMs=Date.now();
   sendTouch(x,y,true);
 });
 screenTouch.addEventListener('pointermove',e=>{
   if(editMode||!e.buttons)return;
-  const rect=screenTouch.getBoundingClientRect();
-  const x=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));
-  const y=Math.max(0,Math.min(1,(e.clientY-rect.top)/rect.height));
+  const now=Date.now();
+  if(now-lastTouchMs<33)return; // ~30fps max to reduce Wi-Fi load
+  lastTouchMs=now;
+  const[x,y]=screenTouchCoords(e);
   sendTouch(x,y,true);
 });
 const releaseScreenTouch=()=>sendTouch(0.5,0.5,false);
